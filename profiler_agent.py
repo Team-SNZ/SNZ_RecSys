@@ -2,11 +2,13 @@ from typing import TypedDict, List
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph_supervisor import create_supervisor
+from langgraph.types import Command
 
 import pandas as pd
 from dotenv import load_dotenv
 import getpass
 import os
+import re
 
 load_dotenv(override=True)
 def _set_env(var: str):
@@ -17,8 +19,8 @@ _set_env("OPENAI_API_KEY")
 llm = ChatOpenAI(model='gpt-4o-mini')
 
 class MyState(TypedDict):
-    User_id: int
-    Profile: str
+    user_id: int
+    profile: str
     rec_people: List[int]
     summary: str
 
@@ -26,18 +28,30 @@ class MyState(TypedDict):
 PATH = "/Users/nayoung/SiNear/prac.csv"
 #####################################################
 
+def parse_profile_output(text: str):
+    """
+    LLM 응답에서 중요 요소, 피하는 요소, 요약을 파싱해서 dict로 반환
+    """
+    important = re.search(r"(?<=- 중요 요소:).*?(?=\n- 피하는 요소:)", text, re.DOTALL)
+    avoid = re.search(r"(?<=- 피하는 요소:).*?(?=\n- 요약:)", text, re.DOTALL)
+    summary = re.search(r"(?<=- 요약:).*", text, re.DOTALL)
+
+    return {
+        "important": important.group(0).strip() if important else "", # 중요 요소
+        "avoid": avoid.group(0).strip() if avoid else "",             # 피하는 요소
+        "summary": summary.group(0).strip() if summary else ""        # 요약
+    }
+
 def profiler_node(state: MyState)-> MyState:
     '''
-    해당 User_id의 messages와 feature를 이용하여 Profile을 생성하는 에이전트입니다. 
+    해당 user_id messages와 feature를 이용하여 Profile을 생성하는 에이전트입니다. 
     '''
-    
-    id = state['User_id']
+    id = state['user_id']
     df = pd.read_csv(PATH)
     try:
-        feature = df[df['User_id'] == id].to_dict(orient="records")[0]
+        feature = df[df['ID'] == id].to_dict(orient="records")[0]
     except IndexError:
         feature = {}
-    # print(feature)
 
     summary = state['summary']
 
@@ -60,14 +74,11 @@ def profiler_node(state: MyState)-> MyState:
     - 요약:
     """
 
-    # response = llm.invoke(prompt).content
-    # state['Profile'] = response
-    # return state
+    total_profile = llm.invoke(prompt).content
+    parsed = parse_profile_output(total_profile)
 
-    profile = llm.invoke(prompt).content
-    return {"Profile": profile}
+    return Command(update={"profile": parsed["summary"]})
     
-
 # 테스트 실행 
 profiler = StateGraph(MyState)
 profiler.add_node("profiler", profiler_node)
@@ -77,12 +88,12 @@ profiler.add_edge("profiler", END)
 app = profiler.compile()
 
 example_input = {
-    "User_id": 99808433,
-    "Profile": "",
+    "user_id": 99808433,
+    "profile": "",
     "rec_people": [],
     "summary": "여행 갈 때는 꼭 계획을 미리 세우고 가는 스타일이에요. 관광 명소는 빠짐없이 다 둘러보고 싶고, 시간 낭비하는 건 싫어요."
 }
 
 # 실행 결과
 result = app.invoke(example_input)
-print("생성된 Profile:", result["Profile"])
+print("생성된 Profile:", result["profile"])
