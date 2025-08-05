@@ -136,7 +136,7 @@ def profiler_node(state: MyState)-> MyState:
     id = state['user_id']
     df = pd.read_csv(PATH)
     try:
-        feature = df[df['user_id'] == id].to_dict(orient="records")[0]
+        feature = df[df['ID'] == id].to_dict(orient="records")[0]
     except IndexError:
         feature = {}
 
@@ -164,7 +164,7 @@ def profiler_node(state: MyState)-> MyState:
     total_profile = llm.invoke(prompt).content
     parsed = parse_profile_output(total_profile)
     print(f"profile: {parsed['summary']}")
-    df.loc[df['user_id'] == id, "profile"] = parsed["summary"]
+    df.loc[df['ID'] == id, "profile"] = parsed["summary"]
     df.to_csv(PATH, index=False)
 
     return Command(update={"profile": parsed["summary"]}, goto= "supervisor")
@@ -178,10 +178,10 @@ def recommender_node(state: MyState, top_k=3) -> MyState:
     user_id = state["user_id"]
     user_profile = state["profile"]
     df = pd.read_csv(PATH)
-    others = df[(df['user_id'] != user_id) & (df['profile'].notna())][['user_id', 'profile']]
+    others = df[(df['ID'] != user_id) & (df['profile'].notna())][['ID', 'profile']]
     
     candidate_texts = "\n".join([
-        f"user_id {row.user_id}: {row.profile}" for row in others.itertuples()
+        f"user_id {row.ID}: {row.profile}" for row in others.itertuples()
     ])
     
     prompt = f"""
@@ -221,7 +221,7 @@ def recommender_node(state: MyState, top_k=3) -> MyState:
     if "rec_ids" not in df.columns:
         df["rec_ids"] = pd.Series(dtype='object')
     
-    df.loc[df['user_id'] == user_id, "rec_ids"] = str(rec_ids)
+    df.loc[df['ID'] == user_id, "rec_ids"] = str(rec_ids)
     df.to_csv(PATH, index=False)
     
     return Command(update={"rec_people": rec_ids}, 
