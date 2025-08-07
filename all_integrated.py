@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import getpass
 import os, re, sys, time, json
-from typing import TypedDict, Annotated, Sequence, Literal
-from operator import add as add_messages
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -16,7 +14,6 @@ from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from typing import TypedDict, Annotated, Sequence
 from operator import add as add_messages
-from typing_extensions import TypedDict
 from langgraph.types import Command
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
