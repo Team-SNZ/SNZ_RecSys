@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import getpass
 import os, re, sys, time, json
+from typing import TypedDict, Annotated, Sequence, Literal
+from operator import add as add_messages
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -14,6 +16,7 @@ from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from typing import TypedDict, Annotated, Sequence
 from operator import add as add_messages
+from typing_extensions import TypedDict
 from langgraph.types import Command
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
@@ -24,12 +27,29 @@ import os
 import getpass
 from typing import List, Dict, Literal, TypedDict, Optional
 import pandas as pd
+from pymongo import MongoClient
+import sys
 
-
+"""
+환경 변수 설정: Open API key, CSV file path
+"""
 def _set_env(var: str) -> None:
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"{var}: ")
+load_dotenv(override=True)
+_set_env("OPENAI_API_KEY")
 
+"""
+MongoDB 연결
+"""
+client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongodb.net/")
+db = client["travel_recsys"]
+col_features = db["user_features"]
+col_profile = db["user_profile"]
+
+"""
+Multi-agent: MyState, Chatbot agent, Profiler agent, Recommender agent, spervisor agent
+"""
 class MyState(TypedDict, total=False):
     user_id: int
     messages: List[Dict[str, str]]            # {"role": "user|assistant", "content": "..."}
@@ -38,10 +58,6 @@ class MyState(TypedDict, total=False):
     rec_travel: List[str]                      # 추천 여행지 id
     summary: str                               # Q&A 요약
 
-
-load_dotenv(override=True)
-_set_env("OPENAI_API_KEY")
-PATH = "SNZ_RecSys/User_100.csv"
 llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
 
 QUESTION_THEMES = [
@@ -77,6 +93,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
     사용자와 5회에 걸쳐 여행 성향 대화를 나눈 뒤, 요약(summary)을 생성하는 노드.
     """
     print("\n---CHATBOT---")
+    
     messages = state.get("messages", [])
     user_message_count = sum(1 for m in messages if m["role"] == "user")
 
@@ -131,13 +148,13 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     '''
     해당 user_id messages와 feature를 이용하여 Profile을 생성하는 에이전트입니다. 
     '''
+    
     print("\n---PROFILER---")
     id = state['user_id']
-    df = pd.read_csv(PATH)
-    try:
-        feature = df[df['ID'] == id].to_dict(orient="records")[0]
-    except IndexError:
-        feature = {}
+    
+    feature_doc = col_features.find_one({"ID": id}) # 현재 유저id인 mondoDB에 저장된 값들 다 불러옴 -> metadata = 'ID', 'Features'
+    feature = feature_doc["Features"] if feature_doc else {} 
+    feature = dict(list(feature.items())[:-1]) # 'Rec_ids' 제거 
 
     summary = state['summary']
 
@@ -151,7 +168,7 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     - 대화 요약:
     {summary}
 
-    아래 형식을 따라, 사용자의 여행에서 중요하게 생각하는 요소(선호), 피하고 싶은 요소(기피), 그리고 이를 요약한 설명을 생성해주세요.  
+    아래 형식을 따라, 사용자의 여행에서 중요하게 생각하는 요소(선호), 피하고 싶은 요소(기피), 그리고 이를 요약한 설명을 2~3문장으로 생성해주세요.  
     **가능하면 구체적인 항목(예: 기후, 동행자 성향, 활동 종류 등)을 명시해주세요.**
 
     <출력 형식>
@@ -159,13 +176,14 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     - 피하는 요소:
     - 요약:
     """
-
+    
     total_profile = llm.invoke(prompt).content
     parsed = parse_profile_output(total_profile)
     print(f"profile: {parsed['summary']}")
-    df.loc[df['ID'] == id, "Profile"] = parsed["summary"]
-    df.to_csv(PATH, index=False)
 
+    col_profile.update_one({"ID": id}, {"$set": {"Profile": parsed["summary"]}}, upsert=True)
+    print("\n---Profile DB Update 완료---")
+    
     return Command(update={"profile": parsed["summary"]}, 
                    goto= "supervisor")
 
@@ -174,14 +192,16 @@ def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
     
     output_parser = CommaSeparatedListOutputParser()
     format_instructions = output_parser.get_format_instructions()
-    
     user_id = state["user_id"]
-    user_profile = state["profile"]
-    df = pd.read_csv(PATH)
-    others = df[(df['ID'] != user_id) & (df['Profile'].notna())][['ID', 'Profile']]
-    
+    user_profile = state["profile"] 
+
+    others = list(col_profile.find({
+    "ID": {"$exists": True, "$ne": user_id},  # 자기 자신 제외 + ID 없는 문서도 제외
+    "Profile": {"$ne": ""}                    # 프로필 비어있지 않은 사람만
+    }))
+
     candidate_texts = "\n".join([
-        f"user_id {row.ID}: {row.Profile}" for row in others.itertuples()
+        f"user_id {row['ID']}: {row.get('Profile', '')}" for row in others
     ])
     
     prompt = f"""
@@ -216,15 +236,15 @@ def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
 
     print(f"최종 추천된 사용자 ID: {rec_ids}")
 
-    if "Rec_ids" not in df.columns:
-        df["Rec_ids"] = pd.Series(dtype='object')
-    
-    df.loc[df['ID'] == user_id, "Rec_ids"] = str(rec_ids)
-    df.to_csv(PATH, index=False)
+    col_features.update_one(
+        {"ID": user_id}, 
+        {"$set": {"Features.Rec_ids": rec_ids}}, 
+        upsert=True
+    )    
+    print("\n---Rec_ids DB Update 완료---")
     
     return Command(update={"rec_people": rec_ids}, 
                    goto="supervisor")
-
 
 def supervisor_node(state: MyState) -> Command[Literal["chatbot", "profiler", "recommender", END]]:
    
