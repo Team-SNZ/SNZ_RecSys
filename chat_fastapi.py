@@ -115,5 +115,5 @@ def _make_summary(state: Dict) -> str:
     )
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
     llm_output = llm.invoke(llm_input).content.strip()
-    col_summary.update_one({"ID": user_id}, {"$set": {"Summary": llm_output}}, upsert=True)
+    col_summary.update_one({"ID": state["user_id"]}, {"$set": {"Summary": llm_output}}, upsert=True)
     return llm.invoke(llm_input).content.strip()
