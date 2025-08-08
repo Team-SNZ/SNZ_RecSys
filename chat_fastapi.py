@@ -125,7 +125,7 @@ def _make_draft_summary(state: Dict) -> str:
     sys_prompt = (
         "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
         "먼저 사용자의 마지막 답변에 공감하세요.\n"
-        "그 후 지금까지의 사용자의 답변을 한 단락으로 누락 없이 정리하세요."
+        "그 후 지금까지의 사용자의 답변을 한 단락으로 누락 없이 정리한 후, 사용자에게 추가하고 싶은 내용이 있는지 피드백을 요청하세요."
     )
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
     assistant = llm.invoke(llm_input).content.strip()
@@ -139,8 +139,8 @@ def _make_final_summary(state: Dict) -> str:
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
     llm_output = llm.invoke(llm_input).content.strip()
     col_summary.update_one({"ID": state["user_id"]}, {"$set": {"Summary": llm_output}}, upsert=True)
-    return llm.invoke(llm_input).content.strip()
+    return llm_output
 
 if __name__ == "__main__":
-    print(f"OPENAI_API_KEY : {os.environ.get("OPENAI_API_KEY", "API 토큰이 올바르지 않습니다.")}")
+    print(f"OPENAI_API_KEY : {os.environ.get('OPENAI_API_KEY', 'API 토큰이 올바르지 않습니다.')}")
     uvicorn.run("chat_fastapi:app", host="0.0.0.0", port=8000, reload=True)
