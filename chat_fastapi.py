@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Dict, List, Literal
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from pymongo import MongoClient
 import uuid
 import os
 import getpass
@@ -16,13 +17,16 @@ load_dotenv(override=True)
 _set_env("OPENAI_API_KEY")
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongodb.net/")
+db = client["travel_recsys"]
+col_summary = db["user_summary"]
 
 QUESTION_THEMES = [
     "여행 중 최악의 경험과 그 이유",
-    "여행지에서 가장 중요하게 여기는 요소",
+    "이번 여행에서 이것만큼은 꼭 있으면 하는 것",
     "같이 여행을 가고 싶은 사람의 특징",
     "이번 여행에서 가장 기대하는 것",
-    "여행 중 스트레스를 받는 순간"
+    "이번 여행이 자신의 삶에 가졌으면 하는 의미"
 ]
 
 def build_prompt(context: str, themes: List[str]) -> str:
@@ -110,4 +114,6 @@ def _make_summary(state: Dict) -> str:
         "사용자의 답변을 한 단락으로 누락 없이 정리하세요."
     )
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
+    llm_output = llm.invoke(llm_input).content.strip()
+    col_summary.update_one({"ID": user_id}, {"$set": {"Summary": llm_output}}, upsert=True)
     return llm.invoke(llm_input).content.strip()
