@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 import uuid
 import os
 import getpass
+import uvicorn
 
 def _set_env(var: str) -> None:
     if not os.environ.get(var):
@@ -64,6 +65,9 @@ class ChatResponse(BaseModel):
 # ---------- FastAPI ----------
 app = FastAPI()
 
+@app.get("/")
+def landing():
+    return "Hello FastAPI"
 @app.post("/chat/start", response_model=ChatResponse)
 def start_chat(req: StartRequest):
     session_id = str(uuid.uuid4())
@@ -98,6 +102,7 @@ def user_reply(req: ReplyRequest):
     assistant = _next_question(st)
     return ChatResponse(assistant=assistant, finished=False)
 
+
 def _next_question(state: Dict) -> str:
     ctx = "\n".join([f"{m['role']}: {m['content']}" for m in state["messages"]])
     assistant = llm.invoke([{"role": "system", "content": build_prompt(ctx, QUESTION_THEMES)}]).content.strip()
@@ -111,3 +116,7 @@ def _make_summary(state: Dict) -> str:
     )
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
     return llm.invoke(llm_input).content.strip()
+
+if __name__ == "__main__":
+    print(f"OPENAI_API_KEY : {os.environ.get("OPENAI_API_KEY", "API 토큰이 올바르지 않습니다.")}")
+    uvicorn.run("chat_fastapi:app", host="0.0.0.0", port=8000, reload=True)
