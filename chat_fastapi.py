@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Dict, List, Literal
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from pymongo import MongoClient
 import uuid
 import os
 import getpass
@@ -17,13 +18,16 @@ load_dotenv(override=True)
 _set_env("OPENAI_API_KEY")
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
+client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongodb.net/")
+db = client["travel_recsys"]
+col_summary = db["user_summary"]
 
 QUESTION_THEMES = [
     "여행 중 최악의 경험과 그 이유",
-    "여행지에서 가장 중요하게 여기는 요소",
+    "이번 여행에서 이것만큼은 꼭 있으면 하는 것",
     "같이 여행을 가고 싶은 사람의 특징",
     "이번 여행에서 가장 기대하는 것",
-    "여행 중 스트레스를 받는 순간"
+    "이번 여행이 자신의 삶에 가졌으면 하는 의미"
 ]
 
 def build_prompt(context: str, themes: List[str]) -> str:
@@ -60,7 +64,8 @@ class ChatResponse(BaseModel):
     session_id: str | None = None
     assistant: str
     finished: bool                
-    summary: str | None = None  
+    draft_summary: str | None = None  
+    final_summary: str | None = None
 
 # ---------- FastAPI ----------
 app = FastAPI()
@@ -69,13 +74,15 @@ app = FastAPI()
 def landing():
     return "Hello FastAPI"
 @app.post("/chat/start", response_model=ChatResponse)
+
 def start_chat(req: StartRequest):
     session_id = str(uuid.uuid4())
     sessions[session_id] = {
         "user_id": req.user_id,
         "messages": [],       # {"role": "assistant|user", "content": "..."}
         "count": 0,           # user message 수
-        "summary": None
+        "draft_summary": None,
+        "final_summary": None
     }
     # 첫 질문 생성
     assistant = _next_question(sessions[session_id])
@@ -91,13 +98,18 @@ def user_reply(req: ReplyRequest):
     st["messages"].append({"role": "user", "content": req.message})
     st["count"] += 1
 
-    if st["count"] >= 5 and st["summary"] is None:
-        st["summary"] = _make_summary(st)
+    if st["count"] >= 5 and st["draft_summary"] is None and st["final_summary"] is None:
+        st["draft_summary"] = _make_draft_summary(st)
+        assistant_text = st["draft_summary"]
+        return ChatResponse(session_id=session_id, assistant=assistant_text, finished=False, draft_summary=st["draft_summary"])
+    
+    elif st["count"] >= 5 and st["draft_summary"] is not None and st["final_summary"] is None:
+        st["final_summary"] = _make_final_summary(st)
         assistant_text = (
             "당신의 적극적인 답변 덕분에 여행 성향을 보다 깊이 이해할 수 있게 되었어요!\n"
             "이를 바탕으로 당신의 여행 메이트와 추천 여행지를 탐색해볼게요!"
         )
-        return ChatResponse(session_id=session_id, assistant=assistant_text, finished=True, summary=st["summary"])
+        return ChatResponse(session_id=session_id, assistant=assistant_text, finished=True, final_summary=st["final_summary"])
 
     assistant = _next_question(st)
     return ChatResponse(assistant=assistant, finished=False)
@@ -109,12 +121,24 @@ def _next_question(state: Dict) -> str:
     state["messages"].append({"role": "assistant", "content": assistant})
     return assistant
 
-def _make_summary(state: Dict) -> str:
+def _make_draft_summary(state: Dict) -> str:
+    sys_prompt = (
+        "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
+        "먼저 사용자의 마지막 답변에 공감하세요.\n"
+        "그 후 지금까지의 사용자의 답변을 한 단락으로 누락 없이 정리하세요."
+    )
+    llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
+    assistant = llm.invoke(llm_input).content.strip()
+    return assistant
+
+def _make_final_summary(state: Dict) -> str:
     sys_prompt = (
         "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
         "사용자의 답변을 한 단락으로 누락 없이 정리하세요."
     )
     llm_input = [{"role": "system", "content": sys_prompt}] + state["messages"]
+    llm_output = llm.invoke(llm_input).content.strip()
+    col_summary.update_one({"ID": state["user_id"]}, {"$set": {"Summary": llm_output}}, upsert=True)
     return llm.invoke(llm_input).content.strip()
 
 if __name__ == "__main__":

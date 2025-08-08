@@ -49,7 +49,7 @@ QUESTION_THEMES = [
     "여행지에서 가장 중요하게 여기는 요소",
     "같이 여행을 가고 싶은 사람의 특징",
     "이번 여행에서 가장 기대하는 것",
-    "여행 중 스트레스를 받는 순간"
+    "이번 여행이 자신의 삶에 어떤 의미를 남기길 바라는 점"
 ]
 
 def _build_prompt(context: str, themes: List[str]) -> str:
@@ -93,25 +93,54 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
             print("입력이 비어 있습니다. 다시 입력해주세요.")
             continue
 
+        if user_message_count == 4:          # 인덱스 0-based  →  다섯 번째
+            empathy_line = (
+                f"말씀해주신 ‘{user_input}’ 정말 인상적이네요! "
+                "이번 여행이 그 목표를 꼭 이루게 도와주길 바라요."
+                )
+            print(f"\nAssistant ▶ {empathy_line}")
+            messages.append({"role": "assistant", "content": empathy_line})
+
         messages.append({"role": "assistant", "content": assistant_response})
         messages.append({"role": "user", "content": user_input})
         user_message_count += 1
 
     # 5개의 user 메시지를 모두 받은 후 summary 생성
     time.sleep(2)
-    print("\nAssistant ▶ 당신의 적극적인 답변 덕분에 당신의 여행 성향에 대해 보다 깊게 이해할 수 있게 되었어요! 이를 바탕으로 당신의 여행 메이트와 추천 여행지를 탐색해볼게요! \n")
+    print("\nAssistant ▶ 당신의 적극적인 답변 덕분에 당신의 여행 성향에 대해 보다 깊게 이해할 수 있게 되었어요! \n")
 
+    # summary 생성 전 답변
+    user_only = [m for m in messages if m["role"] == "user"]
     sys_prompt = (
         "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
         "사용자의 답변을 한 단락으로 누락 없이 정리하세요."
-    )
-    llm_input = [{"role": "system", "content": sys_prompt}] + messages
+        )
+    
+    llm_input = [{"role": "system", "content": sys_prompt}] + user_only
     summary = llm.invoke(llm_input).content.strip()
     print(f"summary: {summary}")
+
+    # 5개의 질문 후 마지막 추가 질문
+    add_q = "이것은 지금까지의 요약입니다.\n혹시 마지막으로 추가하고 싶은 내용이 있다면 자유롭게 답변해주세요!"
+    print(f"Assistant ▶ {add_q}")
+    add_ans = input("\nYou ▶ ").strip()
+
+    if add_ans:                               
+        messages.append({"role": "assistant", "content": add_q})
+        messages.append({"role": "user", "content": add_ans})
+
+        # 추가 답변 포함 새로운 summary
+        llm_input_final = [{"role": "system", "content": sys_prompt}] + messages
+        summary = llm.invoke(llm_input_final).content.strip()
+        print(f"\n[최종 요약] {summary}\n")
+
+
     return Command(
         update={"messages": messages, "summary": summary},
         goto="supervisor",
     )
+
+
 
 def parse_profile_output(text: str):
     """
