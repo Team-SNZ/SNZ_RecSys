@@ -78,7 +78,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
     사용자와 5회에 걸쳐 여행 성향 대화를 나눈 뒤, 요약(summary)을 생성하는 노드.
     """
     print("\n---CHATBOT---")
-    messages = state.get("messages", [])
+    messages = state.get("messages–", [])
     user_message_count = sum(1 for m in messages if m["role"] == "user")
 
     while user_message_count < 5:
