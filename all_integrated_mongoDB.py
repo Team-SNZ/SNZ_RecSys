@@ -46,6 +46,8 @@ client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongod
 db = client["travel_recsys"]
 col_features = db["user_features"]
 col_profile = db["user_profile"]
+col_summary = db["user_summary"]
+col_recs = db["user_recs"]
 
 """
 Multi-agent: MyState, Chatbot agent, Profiler agent, Recommender agent, spervisor agent
@@ -55,79 +57,10 @@ class MyState(TypedDict, total=False):
     profile: str                               # user 요약 정보
     rec_people: List[int]                      # 매칭 후보 id
     rec_travel: List[str]                      # 추천 여행지 link
-    top_100_ids: List[int]                  
+    top_100_ids: List[int]                     # retrieved user ids
 
 llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
 
-QUESTION_THEMES = [
-    "여행 중 최악의 경험과 그 이유",
-    "여행지에서 가장 중요하게 여기는 요소",
-    "같이 여행을 가고 싶은 사람의 특징",
-    "이번 여행에서 가장 기대하는 것",
-    "여행 중 스트레스를 받는 순간"
-]
-
-def _build_prompt(context: str, themes: List[str]) -> str:
-    themes_text = "\n".join([f"- {theme}" for theme in themes])
-    
-    return f"""당신은 사용자의 구체적인 여행 성향을 파악하는 전문 상담가입니다.
-
-<목표>
-아래 5가지 주제에 대해 사용자의 답변을 모두 얻어야 합니다:
-{themes_text}
-
-<현재 대화 상황>
-{context}
-
-<지침>
-1. 위 대화를 분석해서 어떤 주제들이 이미 다뤄졌는지 파악하세요. 
-2. 대화가 없다면, "더 구체적인 당신의 여행 성향을 파악하기 위해 몇 가지 질문을 준비했습니다. 생각나는대로 편하게 답변해주세요!" 와 함께 임의로 한 가지 주제를 정해서 질문을 시작하세요.
-3. 아직 다루지 않은 주제 중에서 가장 자연스럽게 이어갈 수 있는 하나를 선택하세요.
-4. 사용자의 이전 답변에 공감하며 자연스럽게 다음 질문으로 넘어가세요.
-
-상담가의 답변: """
-
-def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
-    """
-    사용자와 5회에 걸쳐 여행 성향 대화를 나눈 뒤, 요약(summary)을 생성하는 노드.
-    """
-    print("\n---CHATBOT---")
-    
-    messages = state.get("messages", [])
-    user_message_count = sum(1 for m in messages if m["role"] == "user")
-
-    while user_message_count < 5:
-        context = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-        assistant_response = llm.invoke([
-            {"role": "system", "content": _build_prompt(context, QUESTION_THEMES)}
-        ]).content.strip()
-
-        print(f"\nAssistant ▶ {assistant_response}")
-        user_input = input("\nYou ▶ ").strip()
-
-        if not user_input:
-            print("입력이 비어 있습니다. 다시 입력해주세요.")
-            continue
-
-        messages.append({"role": "assistant", "content": assistant_response})
-        messages.append({"role": "user", "content": user_input})
-        user_message_count += 1
-
-    # 5개의 user 메시지를 모두 받은 후 summary 생성
-    time.sleep(2)
-    print("\nAssistant ▶ 당신의 적극적인 답변 덕분에 당신의 여행 성향에 대해 보다 깊게 이해할 수 있게 되었어요! 이를 바탕으로 당신의 여행 메이트와 추천 여행지를 탐색해볼게요! \n")
-
-    sys_prompt = (
-        "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
-        "사용자의 답변을 한 단락으로 누락 없이 정리하세요."
-    )
-    llm_input = [{"role": "system", "content": sys_prompt}] + messages
-    summary = llm.invoke(llm_input).content.strip()
-    print(f"summary: {summary}")
-    return Command(
-        update={"messages": messages, "summary": summary},
-        goto="supervisor",
-    )
 
 def parse_profile_output(text: str):
     """
@@ -153,9 +86,8 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     
     feature_doc = col_features.find_one({"ID": id}) # 현재 유저id인 mondoDB에 저장된 값들 다 불러옴 -> metadata = 'ID', 'Features'
     feature = feature_doc["Features"] if feature_doc else {} 
-    feature = dict(list(feature.items())[:-1]) # 'Rec_ids' 제거 
 
-    summary = state['summary']
+    summary = col_summary.find_one({"ID": id})
 
     prompt = f"""
     당신은 여행 동반자 매칭 서비스를 위한 프로파일 생성 에이전트입니다.  
@@ -186,23 +118,34 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     return Command(update={"profile": parsed["summary"]}, 
                    goto= "supervisor")
 
-def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
-    print("\n---RECOMMENDER---")
+#def retriever_node(state: MyState) -> Command[Literal["supervisor"]]:
     
+##### 0810 Recommender tool 추가 #####
+@tool
+def people_rec_tool(state: MyState, top_k=10) -> Command:
+    """
+    기준 사용자 프로필과 top_100 후보의 프로필을 비교하여 상위 top_k명의 사용자 ID를 추천.
+    결과는 DB(col_recs)에 저장하고, state.rec_people에 반영한 뒤 travel_rec_tool로 이동.
+    """
     output_parser = CommaSeparatedListOutputParser()
     format_instructions = output_parser.get_format_instructions()
     user_id = state["user_id"]
-    user_profile = state["profile"] 
-
-    others = list(col_profile.find({
-    "ID": {"$exists": True, "$ne": user_id},  # 자기 자신 제외 + ID 없는 문서도 제외
-    "Profile": {"$ne": ""}                    # 프로필 비어있지 않은 사람만
+    user_profile = state["profile"]
+    top_100_ids = state.get("top_100_ids", [])
+    if not top_100_ids:
+        print("추천할 사용자 ID 목록이 없습니다.")
+        return state
+    
+    print("\n---PEOPLE_REC_TOOL---")
+    others_top_100 = list(col_profile.find({
+        "ID": {"$in": top_100_ids},  # top_100_ids에 있는 사용자들만
+        "Profile": {"$ne": ""}        # 프로필 비어있지 않은 사람만
     }))
 
     candidate_texts = "\n".join([
-        f"user_id {row['ID']}: {row.get('Profile', '')}" for row in others
+        f"user_id {row['ID']}: {row.get('Profile', '')}" for row in others_top_100
     ])
-    
+
     prompt = f"""
 당신은 여행 동행 추천 시스템입니다. 주어진 사용자 프로필과 다른 사용자 목록을 기반으로 가장 잘 맞는 동행자를 추천해야 합니다.
 
@@ -225,47 +168,169 @@ def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
     response_list = chain.invoke([HumanMessage(content=prompt)])
     
     try:
-        rec_ids = [int(item.strip()) for item in response_list]
+        rec_people = [int(item.strip()) for item in response_list]
     except (ValueError, TypeError):
         print("파서가 유효한 숫자 목록을 반환하지 못했습니다.")
-        rec_ids = []
+        rec_people = []
 
-    if rec_ids:
-        rec_ids = rec_ids[:top_k]
+    if rec_people:
+        rec_people = rec_people[:top_k]
 
-    print(f"최종 추천된 사용자 ID: {rec_ids}")
+    print(f"최종 추천된 사용자 ID: {rec_people}")
 
-    col_features.update_one(
+    col_recs.update_one(
         {"ID": user_id}, 
-        {"$set": {"Features.Rec_ids": rec_ids}}, 
+        {"$set": {"Rec_People": rec_people}}, 
         upsert=True
     )    
-    print("\n---Rec_ids DB Update 완료---")
+    print("\n---Rec_People DB Update 완료---")
     
-    return Command(update={"rec_people": rec_ids}, 
-                   goto="supervisor")
+    return Command(update={"rec_people": rec_people}, 
+                   goto="travel_rec_tool")
 
-def supervisor_node(state: MyState) -> Command[Literal["chatbot", "profiler", "recommender", END]]:
-   
-    if state.get("summary") and not state.get("profile"):
+@tool
+def travel_rec_tool(state: MyState, top_k_travel=3) -> MyState:
+    """
+    rec_people의 프로필과 기준 사용자 프로필을 활용해 TravelDB(100개 표본) 중 상위 top_k_travel 여행지 추천.
+    결과는 DB(col_recs)에 저장하고, state.rec_travel에 반영한 뒤 종료.
+    """
+    output_parser = CommaSeparatedListOutputParser()
+    format_instructions = output_parser.get_format_instructions()
+    user_id = state["user_id"]
+    user_profile = state["profile"]
+    rec_people = state.get("rec_people", [])
+    
+    if not rec_people:
+        print("추천할 사용자 ID 목록이 없습니다.")
+        return state
+    
+    print("\n---TRAVEL_REC_TOOL---")
+    others_rec_people = list(col_profile.find({
+        "ID": {"$in": rec_people},  # rec_people에 있는 사용자들만
+        "Profile": {"$ne": ""}       # 프로필 비어있지 않은 사람만
+    }))
+    if not others_rec_people:
+        print("rec_people에 대한 유효한 프로필이 없습니다.")
+        return Command(update={}, goto=END)
+    
+    rec_people_profiles = "\n".join([
+        f"user_id {row['ID']}: {row.get('Profile', '')}" for row in others_rec_people
+    ])
+
+    # TravelDB에서 100개 샘플 로드 (정렬 기준은 상황에 맞게 변경 가능)
+    travels = list(col_travels.find(
+        {},
+        {"_id": 0}  # 전체 필드 사용(코드/링크/키워드/지역 등)
+    ).limit(100))
+
+    if not travels:
+        print("TravelDB에서 여행 데이터를 가져오지 못했습니다.")
+        return Command(update={}, goto=END)
+    
+    # 여행지 목록 요약 텍스트 (LLM 입력 토큰 아끼기 위해 필요한 핵심만)
+    # travel 예시 필드: {"code":"JEJU-OLLE-07","name":"올레길7코스","tags":["힐링","걷기"],"link":"..."}
+    def _fmt_travel(t: Dict[str, Any]) -> str:
+        code = t.get("code") or t.get("id") or t.get("link") or "UNKNOWN"
+        name = t.get("name", "")
+        region = t.get("region", "")
+        tags = t.get("tags", [])
+        tags_s = ", ".join(tags) if isinstance(tags, list) else str(tags)
+        return f"{code} :: {name} :: {region} :: {tags_s}"
+
+    travel_text = "\n".join(_fmt_travel(t) for t in travels)
+
+    prompt = f"""
+당신은 여행지 추천 시스템입니다. 기준 사용자와 그와 잘 맞을 동행자들의 프로필을 바탕으로,
+아래의 여행지 후보들 중 상위 {top_k_travel}개를 골라주세요.
+[기준 사용자 프로필]
+{user_profile}
+[비교할 다른 사용자 프로필 목록]
+{rec_people_profiles}
+[여행지 후보 (code :: name :: region :: tags)]
+{travel_text}
+
+[지시사항]
+1. 기준 사용자와 동행자들의 공통 취향/제약을 파악하세요.
+2. 후보 여행지 중 가장 적합한 상위 {top_k_travel}개를 고르세요.
+3. 최종 응답은 아래 형식 지침을 반드시 따르세요. 코드(또는 링크)만 반환합니다. 설명 금지.
+
+{format_instructions}
+[최종 응답]
+"""
+    chain = llm | output_parser
+    response_list = chain.invoke([HumanMessage(content=prompt)])
+    try:
+        rec_travel = [item.strip() for item in response_list if item.strip()]
+    except (ValueError, TypeError):
+        print("파서가 유효한 여행지 목록을 반환하지 못했습니다.")
+        rec_travel = []
+    if rec_travel:
+        rec_travel = rec_travel[:top_k_travel]
+    print(f"최종 추천된 여행지: {rec_travel}")
+
+    try:
+        col_recs.update_one(
+            {"ID": user_id},
+            {"$set": {"Rec_Travel": rec_travel}},
+            upsert=True
+        )
+        print("\n---Rec_Travel DB Update 완료---")
+    except Exception as e:
+        print(f"Rec_Travel DB 업데이트 실패: {e}")
+
+    return Command(update={"rec_travel": rec_travel}, goto=END)
+    
+
+def recommender_node(state: MyState) -> Command:
+    """
+    실행 순서 제어:
+    - rec_people 없으면 -> people_rec_tool
+    - rec_people 있고 rec_travel 없으면 -> travel_rec_tool
+    - 둘 다 있으면 -> 종료
+    """
+    if not state.get("rec_people"):
+        return Command(update={}, goto="people_rec_tool")
+    if not state.get("rec_travel"):
+        return Command(update={}, goto="travel_rec_tool")
+    return Command(update={}, goto=END)
+
+def supervisor_node(state: MyState) -> Command[Literal["profiler", "retriever", "recommender", END]]:
+    # 1) 프로필이 없으면 → 프로파일러로
+    if not state.get("profile"):
         return Command(goto="profiler")
-    elif state.get("profile") and not state.get("rec_people"):
+
+    # 2) 프로필은 있는데 후보(top_100_ids)가 없으면 → 리트리버로
+    if not state.get("top_100_ids"):
+        return Command(goto="retriever")
+
+    # 3) 후보는 있는데 추천이 덜 끝났으면 → 추천 파이프라인
+    if not state.get("rec_people") or not state.get("rec_travel"):
         return Command(goto="recommender")
-    elif state.get("rec_people"):
-        return Command(goto=END)
-    else:
-        return Command(goto="chatbot")
+
+    # 4) 모두 끝나면 종료
+    return Command(goto=END)
+
 
 def create_graph():
-
     graph = StateGraph(MyState)
-    
+
+    # 코어 노드
     graph.add_node("supervisor", supervisor_node)
-    graph.add_node("chatbot", chatbot_node)
     graph.add_node("profiler", profiler_node)
+    graph.add_node("retriever", retriever_node)          # ← 새로 추가
     graph.add_node("recommender", recommender_node)
-    
+
+    # 추천 툴 노드 (recommender가 호출하여 이동)
+    graph.add_node("people_rec_tool", people_rec_tool)
+    graph.add_node("travel_rec_tool", travel_rec_tool)
+
+    # 시작점
     graph.add_edge(START, "supervisor")
+
+    # 안전망(edge는 각 노드의 Command(goto=...)가 주도하지만 보강 차원에서 추가)
+    graph.add_edge("recommender", "people_rec_tool")
+    graph.add_edge("people_rec_tool", "travel_rec_tool")
+    graph.add_edge("travel_rec_tool", END)
 
     app = graph.compile()
     return app
