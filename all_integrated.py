@@ -55,7 +55,7 @@ QUESTION_THEMES = [
 def _build_prompt(context: str, themes: List[str]) -> str:
     themes_text = "\n".join([f"- {theme}" for theme in themes])
     
-    return f"""당신은 사용자의 구체적인 여행 성향을 파악하는 전문 상담가입니다.
+    return f"""당신은 사용자의 구체적인 여행 성향을 파악하는 따뜻한 전문 상담가입니다.
 
 <목표>
 아래 5가지 주제에 대해 사용자의 답변을 모두 얻어야 합니다:
@@ -96,7 +96,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
         if user_message_count == 4:          # 인덱스 0-based  →  다섯 번째
             empathy_line = (
                 f"말씀해주신 ‘{user_input}’ 정말 인상적이네요! "
-                "이번 여행이 그 목표를 꼭 이루게 도와주길 바라요."
+                "이번 여행에서 그 목표를 꼭 이루실 수 있도록 위니도 응원할게요!"
                 )
             print(f"\nAssistant ▶ {empathy_line}")
             messages.append({"role": "assistant", "content": empathy_line})
@@ -107,7 +107,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
 
     # 5개의 user 메시지를 모두 받은 후 summary 생성
     time.sleep(2)
-    print("\nAssistant ▶ 당신의 적극적인 답변 덕분에 당신의 여행 성향에 대해 보다 깊게 이해할 수 있게 되었어요! \n")
+    print("\nAssistant ▶ 여행가님의 적극적인 답변 덕분에 여행 성향에 대해 보다 깊이 이해할 수 있게 되었어요! \n")
 
     # summary 생성 전 답변
     user_only = [m for m in messages if m["role"] == "user"]
@@ -121,7 +121,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
     print(f"summary: {summary}")
 
     # 5개의 질문 후 마지막 추가 질문
-    add_q = "이것은 지금까지의 요약입니다.\n혹시 마지막으로 추가하고 싶은 내용이 있다면 자유롭게 답변해주세요!"
+    add_q = "지금까지의 요약이에요. \n혹시 마지막으로 덧붙이고 싶은 내용이 있다면 자유롭게 답변해주세요!"
     print(f"Assistant ▶ {add_q}")
     add_ans = input("\nYou ▶ ").strip()
 
@@ -133,6 +133,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
         llm_input_final = [{"role": "system", "content": sys_prompt}] + messages
         summary = llm.invoke(llm_input_final).content.strip()
         print(f"\n[최종 요약] {summary}\n")
+        print(f"\n여행가님의 답변을 바탕으로 지금부터 위니가 분석을 시작할게요! \n결과창으로 이동하기 위해 종료버튼을 눌러주세요~")
 
 
     return Command(
