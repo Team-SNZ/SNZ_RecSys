@@ -41,7 +41,7 @@ class MyState(TypedDict, total=False):
 
 load_dotenv(override=True)
 _set_env("OPENAI_API_KEY")
-PATH = "SNZ_RecSys/User_100.csv"
+PATH = "SNZ_RecSys/User_100SNZ_RecSys/all_integrated.py.csv"
 llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
 
 QUESTION_THEMES = [
