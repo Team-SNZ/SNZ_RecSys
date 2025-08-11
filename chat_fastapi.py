@@ -27,7 +27,7 @@ QUESTION_THEMES = [
     "이번 여행에서 이것만큼은 꼭 있으면 하는 것",
     "같이 여행을 가고 싶은 사람의 특징",
     "이번 여행에서 가장 기대하는 것",
-    "이번 여행이 자신의 삶에 가졌으면 하는 의미"
+    "당신에게 이번 여행이 가져다줄 삶의 의미"
 ]
 
 def build_prompt(context: str, themes: List[str]) -> str:
