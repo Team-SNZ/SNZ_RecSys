@@ -33,15 +33,23 @@ from langchain.schema import Document
 from langchain.vectorstores import FAISS
 
 """
-환경 변수 설정: Open API key, CSV file path
+환경 변수 설정: Open API key
 """
 def _set_env(var: str) -> None:
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"{var}: ")
 load_dotenv(override=True)
 _set_env("OPENAI_API_KEY")
-PATH = "/Users/nayoung/SiNear/User_1000.csv"
-df = pd.read_csv(PATH)
+
+"""
+MongoDB 연결
+"""
+client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongodb.net/")
+db = client["travel_recsys"]
+col_features = db["user_features"]
+col_profile = db["user_profile"]
+col_summary = db["user_summary"]
+col_recs = db["user_recs"]
 
 """
 벡터 DB 생성: 유저 profile의 embedding DB
@@ -49,28 +57,38 @@ df = pd.read_csv(PATH)
 embedding = OpenAIEmbeddings(model="text-embedding-3-small")
 vector_store = None
 
-def build_vector_store_from_csv(df: pd.DataFrame) -> FAISS:
-    docs = [
-        Document(page_content=row["Profile"], metadata={"id": row["ID"]}) # 문서의 메타데이터 키 = id로 조회함!!
-        for _, row in df.iterrows()
-        if pd.notna(row["Profile"])  # NaN 제거
-    ]
+def _load_profile_docs_from_mongoDB(col_profile) -> list[Document]:
+    """
+    MongoDB에서 사용자의 profile을 읽어 Document로 변환
+    """
+    query = {
+        "ID": {"$exists": True},
+        "Profile": {"$type": "string", "$ne": ""}  # 빈 문자열 제외
+    }
+    projection = {"ID": 1, "Profile": 1}
+    cursor = col_profile.find(query, projection)
+
+    docs: list[Document] = []
+    for doc in cursor:
+        try:
+            user_id = int(doc["ID"])
+            user_profile = doc["Profile"]
+            if not user_profile:
+                continue
+            docs.append(Document(page_content=user_profile, metadata={"id": user_id})) 
+        except:
+            continue
+    return docs
+
+def build_vector_store_from_mongo(col_profile) -> FAISS:
+    docs = _load_profile_docs_from_mongoDB(col_profile)
     if not docs:
-        raise RuntimeError("Profile 데이터가 없습니다. CSV에 Profile 컬럼을 확인해 주세요.")
+        raise RuntimeError("user_profile 컬렉션에 벡터화할 Profile이 없습니다.")
     return FAISS.from_documents(docs, embedding)
 
 # 벡터 스토어 생성
 if vector_store is None:
-    vector_store = build_vector_store_from_csv(df)
-
-"""
-MongoDB 연결
-"""
-
-client = MongoClient("mongodb+srv://sjy21ys:cjdthdtla12!@cluster0.ozrm81h.mongodb.net/")
-db = client["travel_recsys"]
-col_features = db["user_features"]
-col_profile = db["user_profile"]
+    vector_store = build_vector_store_from_mongo(col_profile)
 
 """
 Multi-agent: MyState, Chatbot agent, Profiler agent, Recommender agent, spervisor agent
@@ -146,15 +164,17 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
 Retriever 툴 + 노드
 """
 @tool("retriever", return_direct=False)
-def retriever(user_id: int, profile: str) -> List[int]:
+def retriever(user_id: int, profile: str, total_k=120, top_k=100) -> List[int]:
     """
-    입력 프로파일과 가장 유사한 사용자 ID 상위 100개 반환(자기 자신 제외).
+    입력 프로파일과 가장 유사한 사용자 ID 상위 100개 반환(자기 자신 제외)
+    total_k: 중복 고려 총 검색할 ID 개수
+    top_k: 최종 검색할 ID 개수
     """
     global vector_store
     if vector_store is None:
-        vector_store = build_vector_store_from_csv(df)
+        vector_store = build_vector_store_from_mongo(col_profile)
 
-    results = vector_store.similarity_search(query=profile, k=120)  # 여유 있게 뽑고 필터링
+    results = vector_store.similarity_search(query=profile, k=total_k) # 여유 있게 뽑고 필터링
     seen = set()
     top_ids: List[int] = []
     for d in results:
@@ -165,7 +185,7 @@ def retriever(user_id: int, profile: str) -> List[int]:
             continue
         seen.add(other_id)
         top_ids.append(other_id)
-        if len(top_ids) == 100:
+        if len(top_ids) == top_k:
             break
     return top_ids
 
@@ -187,17 +207,22 @@ def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
     format_instructions = output_parser.get_format_instructions()
     user_id = state["user_id"]
     user_profile = state["profile"] 
-    # top_100_ids =  # top 100에서 뽑은 사람들의 프로필만 들어가게 수정
+    top_100_ids =  state.get("top_100_ids", [])
 
-    others = list(col_profile.find({
-    "ID": {"$exists": True, "$ne": user_id},  # 자기 자신 제외 + ID 없는 문서도 제외
-    "Profile": {"$ne": ""}                    # 프로필 비어있지 않은 사람만
-    }))
+    if not top_100_ids:
+        print("top_100_ids가 비어 있습니다. retriever가 먼저 실행되어야 합니다.")
+        return Command(goto="supervisor")
 
-    candidate_texts = "\n".join([
-        f"user_id {row['ID']}: {row.get('Profile', '')}" for row in others
-    ])
+    # top_100_ids에 해당하는 프로필만 mongoDB에서 조회
+    top_100_profiles = col_profile.find(
+        {"ID": {"$in": [i for i in top_100_ids if i != user_id]}, "Profile": {"$ne": ""}},
+        {"ID": 1, "Profile": 1}
+    )
     
+    id2prof = {doc["ID"]: doc["Profile"] for doc in top_100_profiles}
+    ordered_pairs = [(i, id2prof[i]) for i in top_100_ids if i in id2prof]
+    candidate_texts = "\n".join([f"user_id {i}: {p}" for i, p in ordered_pairs])
+
     prompt = f"""
 당신은 여행 동행 추천 시스템입니다. 주어진 사용자 프로필과 다른 사용자 목록을 기반으로 가장 잘 맞는 동행자를 추천해야 합니다.
 
@@ -227,12 +252,11 @@ def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
 
     if rec_ids:
         rec_ids = rec_ids[:top_k]
-
     print(f"최종 추천된 사용자 ID: {rec_ids}")
 
-    col_features.update_one(
+    col_recs.update_one(
         {"ID": user_id}, 
-        {"$set": {"Features.Rec_ids": rec_ids}}, 
+        {"$set": {"Recs.Rec_People": rec_ids}}, 
         upsert=True
     )    
     print("\n---Rec_ids DB Update 완료---")
@@ -272,12 +296,11 @@ if __name__ == "__main__":
     app = create_graph()
 
     initial_state: MyState = {
-        "user_id": 1,
-        # "messages": [],
+        "user_id": 2,
         "profile": "",
         "rec_people": [],
         "rec_travel": [],
-        # "summary": "",
+        "top_100_ids": []
     }
 
     final_state = app.invoke(initial_state)
