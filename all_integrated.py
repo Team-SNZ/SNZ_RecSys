@@ -55,10 +55,10 @@ QUESTION_THEMES = [
 def _build_prompt(context: str, themes: List[str]) -> str:
     themes_text = "\n".join([f"- {theme}" for theme in themes])
     
-    return f"""당신은 사용자의 구체적인 여행 성향을 파악하는 따뜻한 전문 상담가입니다.
+    return f"""당신은 여행가의 구체적인 여행 성향을 파악하는 따뜻한 전문 상담가입니다.
 
 <목표>
-아래 5가지 주제에 대해 사용자의 답변을 모두 얻어야 합니다:
+아래 5가지 주제에 대해 여행가의 답변을 모두 얻어야 합니다:
 {themes_text}
 
 <현재 대화 상황>
@@ -68,7 +68,7 @@ def _build_prompt(context: str, themes: List[str]) -> str:
 1. 위 대화를 분석해서 어떤 주제들이 이미 다뤄졌는지 파악하세요. 
 2. 대화가 없다면, "더 구체적인 당신의 여행 성향을 파악하기 위해 몇 가지 질문을 준비했습니다. 생각나는대로 편하게 답변해주세요!" 와 함께 임의로 한 가지 주제를 정해서 질문을 시작하세요.
 3. 아직 다루지 않은 주제 중에서 가장 자연스럽게 이어갈 수 있는 하나를 선택하세요.
-4. 사용자의 이전 답변에 공감하며 자연스럽게 다음 질문으로 넘어가세요.
+4. 여행가의 이전 답변에 공감하며 자연스럽게 다음 질문으로 넘어가세요.
 
 상담가의 답변: """
 
@@ -79,6 +79,21 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
     print("\n---CHATBOT---")
     messages = state.get("messages", [])
     user_message_count = sum(1 for m in messages if m["role"] == "user")
+
+    if user_message_count == 0:
+        first_msg = (
+        "안녕하세요! 저는 AI 여행 매니저 위니에요:)\n"
+        "최고의 여행이 되도록 제가 돕기 위해 몇 가지 질문을 준비했습니다. "
+        "생각나는대로 편하게 답변해주세요!\n\n"
+        "먼저, 여행 중 최악의 경험과 그 이유가 무엇인지 알려주실 수 있나요?")
+
+    print(f"\nAssistant ▶ {first_msg}")
+    messages.append({"role": "assistant", "content": first_msg})
+    user_input = input("\nYou ▶ ").strip()
+
+    if user_input:
+        messages.append({"role": "user", "content": user_input})
+        user_message_count += 1
 
     while user_message_count < 5:
         context = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
@@ -94,10 +109,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
             continue
 
         if user_message_count == 4:          # 인덱스 0-based  →  다섯 번째
-            empathy_line = (
-                f"말씀해주신 ‘{user_input}’ 정말 인상적이네요! "
-                "이번 여행에서 그 목표를 꼭 이루실 수 있도록 위니도 응원할게요!"
-                )
+            empathy_line = (f"이번 여행에서 그 목표를 꼭 이루실 수 있도록 위니도 응원할게요~ *_*")
             print(f"\nAssistant ▶ {empathy_line}")
             messages.append({"role": "assistant", "content": empathy_line})
 
@@ -112,8 +124,8 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
     # summary 생성 전 답변
     user_only = [m for m in messages if m["role"] == "user"]
     sys_prompt = (
-        "다음 대화는 사용자의 여행 성향을 파악하기 위한 Q&A입니다.\n"
-        "사용자의 답변을 한 단락으로 누락 없이 정리하세요."
+        "다음 대화는 여행가님의 여행 성향을 파악하기 위한 Q&A입니다.\n"
+        "여행가님의 답변을 한 단락으로 누락 없이 정리하세요.\n"
         )
     
     llm_input = [{"role": "system", "content": sys_prompt}] + user_only
@@ -132,6 +144,7 @@ def chatbot_node(state: MyState) -> Command[Literal["supervisor"]]:
         # 추가 답변 포함 새로운 summary
         llm_input_final = [{"role": "system", "content": sys_prompt}] + messages
         summary = llm.invoke(llm_input_final).content.strip()
+        print(f"\nAssistant ▶ 여행가님의 답변을 바탕을 위니가 만든 최종 요약입니다!")
         print(f"\n[최종 요약] {summary}\n")
         print(f"\n여행가님의 답변을 바탕으로 지금부터 위니가 분석을 시작할게요! \n결과창으로 이동하기 위해 종료버튼을 눌러주세요~")
 

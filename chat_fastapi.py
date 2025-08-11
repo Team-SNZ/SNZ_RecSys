@@ -74,7 +74,6 @@ app = FastAPI()
 def landing():
     return "Hello FastAPI"
 @app.post("/chat/start", response_model=ChatResponse)
-
 def start_chat(req: StartRequest):
     session_id = str(uuid.uuid4())
     sessions[session_id] = {
