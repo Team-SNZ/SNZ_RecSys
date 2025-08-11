@@ -128,8 +128,7 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     feature = feature_doc["Features"] if feature_doc else {} 
     feature = dict(list(feature.items())[:-1]) # 'Rec_ids' 제거 
 
-    # summary = state['summary'] # mongo DB 연결해서 가려오는 걸로 변경
-    summary = "사용자는 여행지에서 그 지역의 문화를 최대한 즐기고 싶어하며, 특히 문화 유산을 둘러보는 것을 중요하게 여깁니다. 함께 여행할 사람으로는 대화가 잘 통하는 사람을 선호하고, 여행 중에는 그 지역의 유명한 맛집을 방문하여 맛있는 음식을 많이 먹고 싶어합니다. 그러나 더위를 많이 타기 때문에 땀을 많이 흘리게 되는 상황에서 스트레스를 받을 수 있습니다."
+    summary = col_summary.find_one({"ID": id})["Summary"]
 
     prompt = f"""
     당신은 여행 동반자 매칭 서비스를 위한 프로파일 생성 에이전트입니다.  
@@ -200,7 +199,7 @@ def retriever_node(state: MyState) -> Command[Literal["supervisor"]]:
     return Command(update={"top_100_ids": top_100_ids}, 
                    goto="supervisor")
 
-def recommender_node(state: MyState, top_k=3) -> Command[Literal["supervisor"]]:
+def recommender_node(state: MyState, top_k=10) -> Command[Literal["supervisor"]]:
     print("\n---RECOMMENDER---")
     
     output_parser = CommaSeparatedListOutputParser()
@@ -296,7 +295,7 @@ if __name__ == "__main__":
     app = create_graph()
 
     initial_state: MyState = {
-        "user_id": 2,
+        "user_id": 1,
         "profile": "",
         "rec_people": [],
         "rec_travel": [],
@@ -304,3 +303,5 @@ if __name__ == "__main__":
     }
 
     final_state = app.invoke(initial_state)
+
+    
