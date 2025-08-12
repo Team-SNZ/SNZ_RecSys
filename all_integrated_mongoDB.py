@@ -29,6 +29,8 @@ from typing import List, Dict, Literal, TypedDict, Optional
 import pandas as pd
 from pymongo import MongoClient
 import sys
+from langchain.schema import Document
+from langchain.vectorstores import FAISS
 
 """
 환경 변수 설정: Open API key, CSV file path
@@ -48,12 +50,32 @@ col_features = db["user_features"]
 col_profile = db["user_profile"]
 col_summary = db["user_summary"]
 col_recs = db["user_recs"]
+col_travels = db["travel_db"]
+"""
+벡터 DB 생성: 유저 profile의 embedding DB
+"""
+embedding = OpenAIEmbeddings(model="text-embedding-3-small")
+vector_store = None
+
+def build_vector_store_from_csv(df: pd.DataFrame) -> FAISS:
+    docs = [
+        Document(page_content=row["Profile"], metadata={"id": row["ID"]}) # 문서의 메타데이터 키 = id로 조회함!!
+        for _, row in df.iterrows()
+        if pd.notna(row["Profile"])  # NaN 제거
+    ]
+    if not docs:
+        raise RuntimeError("Profile 데이터가 없습니다. CSV에 Profile 컬럼을 확인해 주세요.")
+    return FAISS.from_documents(docs, embedding)
+
+# 벡터 스토어 생성
+if vector_store is None:
+    vector_store = build_vector_store_from_csv(df)
 
 """
 Multi-agent: MyState, Chatbot agent, Profiler agent, Recommender agent, spervisor agent
 """
 class MyState(TypedDict, total=False):
-    user_id: int
+    user_id: str
     profile: str                               # user 요약 정보
     rec_people: List[int]                      # 매칭 후보 id
     rec_travel: List[str]                      # 추천 여행지 link
@@ -98,7 +120,7 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
 
     - 대화 요약:
     {summary}
-
+    
     아래 형식을 따라, 사용자의 여행에서 중요하게 생각하는 요소(선호), 피하고 싶은 요소(기피), 그리고 이를 요약한 설명을 2~3문장으로 생성해주세요.  
     **가능하면 구체적인 항목(예: 기후, 동행자 성향, 활동 종류 등)을 명시해주세요.**
 
@@ -118,7 +140,42 @@ def profiler_node(state: MyState) -> Command[Literal["supervisor"]]:
     return Command(update={"profile": parsed["summary"]}, 
                    goto= "supervisor")
 
-#def retriever_node(state: MyState) -> Command[Literal["supervisor"]]:
+
+## Retriever 툴 + 노드
+@tool("retriever", return_direct=False)
+def retriever(user_id: int, profile: str) -> List[int]:
+    """
+    입력 프로파일과 가장 유사한 사용자 ID 상위 100개 반환(자기 자신 제외).
+    """
+    global vector_store
+    if vector_store is None:
+        vector_store = build_vector_store_from_csv(df)
+
+    results = vector_store.similarity_search(query=profile, k=120)  # 여유 있게 뽑고 필터링
+    seen = set()
+    top_ids: List[int] = []
+    for d in results:
+        other_id = int(d.metadata.get("id"))  # 소문자 id!
+        if other_id == int(user_id):
+            continue
+        if other_id in seen:
+            continue
+        seen.add(other_id)
+        top_ids.append(other_id)
+        if len(top_ids) == 100:
+            break
+    return top_ids
+
+def retriever_node(state: MyState) -> Command[Literal["supervisor"]]:
+    print("\n---RETRIEVER---")
+    user_id = state["user_id"]
+    user_profile = state["profile"] 
+    top_100_ids = retriever.invoke({"user_id": user_id, "profile": user_profile})
+    print(len(top_100_ids))
+    print(top_100_ids)
+
+    return Command(update={"top_100_ids": top_100_ids}, 
+                   goto="supervisor")
     
 ##### 0810 Recommender tool 추가 #####
 @tool
