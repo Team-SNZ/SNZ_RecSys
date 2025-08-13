@@ -1,0 +1,94 @@
+paths = [thai_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AAP202250902TWA&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AAP200250906TWL&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=ACP200250901OZ1&prePage=major-products"]
+
+phili_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=APP2302509017CM&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=APP2382509017CE&prePage=major-products"]
+
+viet_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AVP231250901LJA&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AVP231250901LJE&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AVP209250901VJW&prePage=major-products"]
+
+taiwan_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=ATP3202509017CQ&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=ATP214250901LJB&prePage=major-products"]
+
+jeju_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP115250815ZEC&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP211250816BXB&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP200250815BXG&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP230250816ZEG&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP113250815BXP&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP150250816KEU&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP212250816ZET&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP1122508167CG&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP1002508157C1&prePage=major-products",
+              "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP201250815ZEG&prePage=major-products"]
+
+inside_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP32825082000A&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP31025081500A&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP600250816001&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP601250822001&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP767250815001&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP907250820001&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP662250816000&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP644250816001&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP91125081900A&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=AKP714250820001&prePage=major-products"]
+
+hawaii_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HHP100250901YP1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HHB102250901YP6&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HHB146250901YP6&prePage=major-products"]
+
+USwest_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HWP133250905YP8&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HWP163250901YPS&prePage=major-products"]
+
+USeast_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HEP102250905KEA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HEP112250906OZA&prePage=major-products"]
+
+Canada_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HCP111250906WS1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=HCP133250904KE1&prePage=major-products"]
+
+Latin_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=SSP130250901KEA&prePage=major-products"]
+
+japan_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JTP140250902OZM&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JOP1312509017CE&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JKP130250901TWX&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JSP1482509017CW&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JWP137250901TWA&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JTP140250901TWM&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JTP130250901ZEW&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JOB138250901BXK&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JOP1752509017CN&prePage=major-products",
+               "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=JKP140250901TWO&prePage=major-products"]
+
+EU_Africa_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EWP131250901KEE&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EWP141250901KEA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EWP136250901TKZ&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EEP133250902OZU&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EEP134250902KE0&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EBP132250901KEA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=ESP131250905TWG&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EMP1332509273UA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=FCP131250903KEA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=EAP131250902KED&prePage=major-products"]
+
+China_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CQX71025090100L&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CHP101250901YPW&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CMP1742509017CB&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CFP105250903OZH&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CFP114250901ZEM&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CFP135250907OZA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CCP103250901OZX&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CBP111250901KEA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CDP101250901CZA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=CAP1012509027C8&prePage=major-products"]
+
+Guam_paths = ["https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PGB275250901LJ1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PGP125250901LJ1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PSB1152509017CW&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PSB2352509017CW&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PAP101250901TW1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PAP105250906OZA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PAG101250904JQA&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PNP101250907KE1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PNZ155250901KE1&prePage=major-products",
+                "https://hope.hanatour.com/trp/pkg/CHPC0PKG0200M200?pkgCd=PNZ135250901KE1&prePage=major-products"]]
