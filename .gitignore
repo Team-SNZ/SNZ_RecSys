@@ -1,6 +1,17 @@
 .env
 .idea
+.conda
 __pycache__
 .ipynb_checkpoints
 .DS_Store
 finetuned_feedback_model/
+
+# uv
+.venv/
+*.pyc
+.python-version
+uv.lock
+
+# cursor
+.cursor
+*.code-workspace

@@ -1,0 +1,22 @@
+[project]
+name = "WiNear-AI"
+version = "0.1.0"
+description = "WiNear 서비스의 AI 백앤드 시스템입니다."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111.0",
+    "langchain-community==0.3.27",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langgraph==0.6.0",
+    "langgraph-sdk==0.2.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.1",
+    "motor>=3.3.1",
+    "python-dotenv>=1.0.1",
+    "pymongo>=4.8,<5",
+    "faiss-cpu>=1.7.4",
+    "openai>=1.0.0",
+]

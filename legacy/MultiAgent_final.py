@@ -1,33 +1,14 @@
 from dotenv import load_dotenv
-import matplotlib.pyplot as plt
-import networkx as nx
-import getpass
-import os, re, sys, time, json
-from operator import add as add_messages
-from langgraph.graph import StateGraph, START, END, MessagesState
-from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, ToolMessage
+import os, re, getpass
+from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
 from langchain_core.tools import tool
-from langchain_tavily import TavilySearch
-from operator import add as add_messages
 from langgraph.types import Command
-from langchain_community.utilities import SQLDatabase
-from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_core.output_parsers import CommaSeparatedListOutputParser
-from langgraph.prebuilt.tool_node import ToolNode
-from langgraph.prebuilt import tools_condition, create_react_agent
-import os, json, time
-import getpass
-import pandas as pd
 from pymongo import MongoClient
-import sys
-from langchain.schema import Document
-from typing import Annotated, Sequence, Literal, List, Dict
-from typing_extensions import TypedDict        
-from create_vectorstore import *
+from typing import Literal, List, Dict, TypedDict
+from create_vectorstore import load_or_build_vector_store, build_vector_store_from_mongo, embedding
 
 """
 환경 변수 설정: Open API key 
@@ -36,7 +17,7 @@ def _set_env(var: str) -> None:
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"{var}: ")
 load_dotenv(override=True)
-_set_env("OPENAI_API_KEY")
+_set_env("WINEAR_OPENAI_API_KEY")
 
 """
 MongoDB 연결
