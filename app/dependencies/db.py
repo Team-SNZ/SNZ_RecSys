@@ -1,6 +1,5 @@
 from fastapi import HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from typing import Optional
 
 
 def get_db(request: Request) -> AsyncIOMotorDatabase:
