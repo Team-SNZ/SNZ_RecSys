@@ -48,7 +48,13 @@ async def lifespan(app: FastAPI):
 
 
 settings = get_settings()
-app = FastAPI(title="WiNear API - RecSys Backend", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="WiNear API - RecSys Backend",
+    version="0.1.0",
+    lifespan=lifespan,
+    root_path="",
+    docs_url="/docs",
+)
 
 app.add_middleware(
     CORSMiddleware,
