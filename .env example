@@ -1,0 +1,15 @@
+# 1. 이 파일의 이름을 .env로 바꿔주세요
+# 2. 아래 환경변수에 알맞은 값을 채워주세요.
+
+# MongoDB connection
+WINEAR_MONGODB_URI="mongodb+srv://{사용자이름}:{비밀번호}@cluster0.ozrm81h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+WINEAR_MONGODB_DB="이곳에 MongoDB DB 이름을 입력해주세요. WiNear atlas 의 경우, travel_recsys 입니다."
+WINEAR_MONGODB_SERVER_API="1"
+
+# CORS origins for Flutter (JSON array). Use ["*"] to allow all in dev
+WINEAR_ALLOWED_ORIGINS=["*"]
+
+# OpenAI API
+WINEAR_OPENAI_API_KEY="이곳에 OPENAI API KEY를 입력해주세요"
+WINEAR_OPENAI_MODEL="gpt-4o"
+WINEAR_OPENAI_TEMPERATURE=0.3
