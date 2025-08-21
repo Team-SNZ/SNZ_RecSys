@@ -50,6 +50,7 @@ jobs:
           target: production
           push: true
           platforms: linux/amd64,linux/arm64
+          no-cache: true
           tags: |
             ${{ env.AGENT_IMAGE }}:${{ steps.meta.outputs.sha }}
             ${{ env.AGENT_IMAGE }}:edge
