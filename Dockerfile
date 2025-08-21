@@ -28,7 +28,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 # 앱 코드 복사
 COPY app/ ./app/
+COPY scripts/ ./scripts/
+COPY data/ ./data/
 COPY *.py ./
+COPY scripts/requirements.txt .
+
+# Requirements.txt 설치
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 데이터/로그 디렉토리
 RUN mkdir -p faiss_user_profiles logs
