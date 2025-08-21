@@ -10,7 +10,6 @@ finetuned_feedback_model/
 .venv/
 *.pyc
 .python-version
-uv.lock
 
 # cursor
 .cursor
