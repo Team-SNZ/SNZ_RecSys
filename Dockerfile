@@ -33,6 +33,9 @@ COPY data/ ./data/
 COPY *.py ./
 COPY scripts/requirements.txt .
 
+# scripts 복사 여부 로그
+RUN ls -al /app && ls -al /app/scripts || true
+
 # Requirements.txt 설치
 RUN pip install --no-cache-dir -r requirements.txt
 
