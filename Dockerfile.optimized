@@ -1,0 +1,67 @@
+# ---------- Base with optimized caching ----------
+FROM python:3.10-slim AS base
+
+# Install system dependencies in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:0.8.11 /uv /uvx /bin/
+
+WORKDIR /app
+
+# Copy dependency files first for better layer caching
+COPY pyproject.toml uv.lock* ./
+
+# Set environment variables for faster builds
+ENV UV_PIP_FLAGS="--only-binary=:all: --no-cache-dir"
+ENV UV_CACHE_DIR=/tmp/uv-cache
+ENV PIP_CACHE_DIR=/tmp/pip-cache
+
+# Install dependencies with uv (faster than pip)
+RUN mkdir -p ${UV_CACHE_DIR} ${PIP_CACHE_DIR} && \
+    uv sync --frozen --no-cache
+
+# ---------- Development ----------
+FROM base AS development
+EXPOSE 8000
+ENV PYTHONPATH=/app UVICORN_HOST=0.0.0.0 UVICORN_PORT=8000
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host","0.0.0.0","--port","8000","--reload"]
+
+# ---------- Production ----------
+FROM base AS production
+
+# Copy application code
+COPY app/ ./app/
+COPY scripts/ ./scripts/
+COPY data/ ./data/
+COPY *.py ./
+COPY scripts/requirements.txt .
+
+# Install additional requirements if needed
+RUN if [ -f requirements.txt ]; then \
+    pip install --no-cache-dir -r requirements.txt; \
+    fi
+
+# Create necessary directories
+RUN mkdir -p faiss_user_profiles logs
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -m -r -g appuser appuser
+ENV XDG_CACHE_HOME=/home/appuser/.cache
+RUN mkdir -p ${XDG_CACHE_HOME} && chown -R appuser:appuser /home/appuser
+
+# Set permissions
+RUN chown -R appuser:appuser /app/faiss_user_profiles /app/logs
+
+USER appuser
+
+EXPOSE 8000
+ENV PYTHONPATH=/app UVICORN_HOST=0.0.0.0 UVICORN_PORT=8000 PYTHONOPTIMIZE=1
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host","0.0.0.0","--port","8000","--workers","4"]
