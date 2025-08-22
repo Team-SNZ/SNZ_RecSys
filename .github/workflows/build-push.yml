@@ -1,4 +1,4 @@
-name: backend - build & push (multi-arch) + deploy
+name: recsys-agent - build & push (multi-arch) + deploy
 
 on:
   push:
@@ -9,7 +9,8 @@ jobs:
   build-push:
     runs-on: ubuntu-latest
     env:
-      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/winear-backend
+      AGENT_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/winear-recsys-agent
+      INJECT_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/winear-mongo-injector
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +41,8 @@ jobs:
           fi
 
       # 멀티아치 빌드 + 푸시 (amd64, arm64)
-      - name: Build & Push (edge + sha; multi-arch)
+      # 1) 에이전트 이미지
+      - name: Build & Push agent (edge + sha; multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -48,21 +50,42 @@ jobs:
           target: production
           push: true
           platforms: linux/amd64,linux/arm64
-          no-cache: true
           tags: |
-            ${{ env.IMAGE }}:${{ steps.meta.outputs.sha }}
-            ${{ env.IMAGE }}:edge
-          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to:   type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+            ${{ env.AGENT_IMAGE }}:${{ steps.meta.outputs.sha }}
+            ${{ env.AGENT_IMAGE }}:edge
+          cache-from: type=registry,ref=${{ env.AGENT_IMAGE }}:buildcache
+          cache-to:   type=registry,ref=${{ env.AGENT_IMAGE }}:buildcache,mode=max
+
+      # 2) 인젝터 이미지 (별도 Dockerfile)
+      - name: Build & Push injector (edge + sha; multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./scripts/Dockerfile.injector
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.INJECT_IMAGE }}:${{ steps.meta.outputs.sha }}
+            ${{ env.INJECT_IMAGE }}:edge
+          cache-from: type=registry,ref=${{ env.INJECT_IMAGE }}:buildcache
+          cache-to:   type=registry,ref=${{ env.INJECT_IMAGE }}:buildcache,mode=max
 
       # 릴리스 태그(v*)면 version + latest로 멀티아치 매니페스트 승격
-      - name: Promote for release (version + latest)
+      - name: Promote (version + latest) — agent
         if: steps.meta.outputs.is_tag == 'true'
         run: |
           docker buildx imagetools create \
-            -t ${{ env.IMAGE }}:${{ steps.meta.outputs.version }} \
-            -t ${{ env.IMAGE }}:latest \
-            ${{ env.IMAGE }}:${{ steps.meta.outputs.sha }}
+            -t ${{ env.AGENT_IMAGE }}:${{ steps.meta.outputs.version }} \
+            -t ${{ env.AGENT_IMAGE }}:latest \
+            ${{ env.AGENT_IMAGE }}:${{ steps.meta.outputs.sha }}
+
+      - name: Promote (version + latest) — injector
+        if: steps.meta.outputs.is_tag == 'true'
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.INJECT_IMAGE }}:${{ steps.meta.outputs.version }} \
+            -t ${{ env.INJECT_IMAGE }}:latest \
+            ${{ env.INJECT_IMAGE }}:${{ steps.meta.outputs.sha }}
 
   deploy:
     needs: build-push
@@ -78,6 +101,7 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/stack
-            docker compose pull
-            docker compose up -d
+            docker compose -f compose.yml -f compose.prod.yml pull winear-recsys-agent
+            docker compose -f compose.yml -f compose.prod.yml up -d --no-build winear-recsys-agent
             docker image prune -f
+            # 인젝터는 기본 up에 포함되지 않음(필요 시 init 프로파일로 따로 실행)
