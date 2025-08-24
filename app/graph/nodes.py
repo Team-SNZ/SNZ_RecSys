@@ -43,7 +43,7 @@ def profiler_node(state: MyState, collections: Dict, llm) -> Command[Literal["su
     col_profile = collections["col_profile"]
     
     feature_doc = col_features.find_one({"ID": user_id})
-    feature = feature_doc["Features"] if feature_doc else {}
+    feature = feature_doc["features"] if feature_doc else {}
     
     summary_doc = col_summary.find_one({"ID": user_id})
     summary = summary_doc["Summary"] if summary_doc else ""
