@@ -1,3 +1,4 @@
+import datetime
 from langchain_core.tools import tool
 from typing import List, Dict, Any
 from langgraph.types import Command
@@ -5,6 +6,8 @@ from langgraph.graph import END
 from langchain_core.output_parsers import CommaSeparatedListOutputParser
 from langchain_core.messages import HumanMessage
 import logging
+
+from pymongo import ReturnDocument
 
 from app.graph.state import MyState
 from app.services.vectorstore import get_vector_store_manager
@@ -68,7 +71,7 @@ def people_rec_tool(state: MyState, collections: Dict, llm) -> Command:
     output_parser = CommaSeparatedListOutputParser()
     format_instructions = output_parser.get_format_instructions()
     
-    user_id = state["user_id"]
+    user_id = str(state["user_id"])
     user_profile = state["profile"]
     top_100_ids = state.get("top_100_ids", [])
     
@@ -113,10 +116,20 @@ def people_rec_tool(state: MyState, collections: Dict, llm) -> Command:
 
     # DB 업데이트
     col_recs = collections["col_recs"]
-    col_recs.update_one(
+    col_recs.find_one_and_update(
         {"ID": user_id}, 
-        {"$set": {"Recs.Rec_People": rec_people}}, 
-        upsert=True
+        {
+            "$setOnInsert": {
+                "ID": user_id,
+                "createdAt": datetime.datetime.now(datetime.timezone.utc),
+            },
+            "$set": {
+                "Recs.Rec_People": rec_people,
+                "updatedAt": datetime.datetime.now(datetime.timezone.utc)
+            }
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER
     )    
     logger.info("---Rec_People DB Update 완료---")
     
@@ -201,10 +214,19 @@ def travel_rec_tool(state: MyState, collections: Dict, llm) -> Command:
     # DB 업데이트
     try:
         col_recs = collections["col_recs"]
-        col_recs.update_one(
+        col_recs.find_one_and_update(
             {"ID": user_id},
-            {"$set": {"Recs.Rec_Travel": rec_travel}}, 
-            upsert=True
+            {
+                "$setOnInsert": {
+                    "ID": user_id,
+                    "createdAt": datetime.datetime.now(datetime.timezone.utc),
+                },
+                "$set": {"Recs.Rec_Travel": rec_travel,
+                    "updatedAt": datetime.datetime.now(datetime.timezone.utc)
+                }
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER
         )
         logger.info("---Rec_Travel DB Update 완료---")
     except Exception as e:
